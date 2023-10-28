@@ -231,6 +231,8 @@ public class Storage implements Listener {
             parts.put("!z", Integer.toString(z));
 
             SignShop.log(SignShop.getInstance().getSignShopConfig().getError("this_shop_exceeded_max_amount_of_chests", parts), Level.WARNING);
+            invalidShops.put(key, sellerSettings);
+            return false;
         }
 
         addSeller(seller_owner.GetIdentifier(), seller_shopworld, seller_sign, seller_containables, seller_activatables, seller_items, miscsettings, false);

@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.wargamer2010.signshop.Seller;
 import org.wargamer2010.signshop.SignShop;
+import org.wargamer2010.signshop.configuration.SignShopConfig;
 import org.wargamer2010.signshop.configuration.Storage;
 import org.wargamer2010.signshop.events.SSCreatedEvent;
 import org.wargamer2010.signshop.events.SSEventFactory;
@@ -21,8 +22,10 @@ import org.wargamer2010.signshop.util.economyUtil;
 import org.wargamer2010.signshop.util.itemUtil;
 import org.wargamer2010.signshop.util.signshopUtil;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 public class LinkAdditionalBlocks implements SignShopSpecialOp {
 
@@ -55,6 +58,7 @@ public class LinkAdditionalBlocks implements SignShopSpecialOp {
     public Boolean runOperation(List<Block> clickedBlocks, PlayerInteractEvent event, Boolean ranSomething) {
         if(ranSomething)
             return false;
+        SignShopConfig signShopConfig = SignShop.getInstance().getSignShopConfig();
         Player player = event.getPlayer();
         SignShopPlayer ssPlayer = PlayerCache.getPlayer(player);
         Block bClicked = event.getClickedBlock();
@@ -62,14 +66,14 @@ public class LinkAdditionalBlocks implements SignShopSpecialOp {
         String sOperation = signshopUtil.getOperation(((Sign) bClicked.getState()).getSide(Side.FRONT).getLine(0));
         if (seller == null)
             return false;
-        if (ssPlayer.getItemInHand() == null || ssPlayer.getItemInHand().getType() != SignShop.getInstance().getSignShopConfig().getLinkMaterial())
+        if (ssPlayer.getItemInHand() == null || ssPlayer.getItemInHand().getType() != signShopConfig.getLinkMaterial())
             return false;
         SignShopPlayer ssOwner = seller.getOwner();
-        List<String> operation = SignShop.getInstance().getSignShopConfig().getBlocks(sOperation);
+        List<String> operation = signShopConfig.getBlocks(sOperation);
         String[] sLines = ((Sign) bClicked.getState()).getSide(Side.FRONT).getLines();
 
         if (!seller.isOwner(ssPlayer) && !ssPlayer.isOp()) {
-            ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("no_permission", null));
+            ssPlayer.sendMessage(signShopConfig.getError("no_permission", null));
             return true;
         }
 
@@ -81,9 +85,26 @@ public class LinkAdditionalBlocks implements SignShopSpecialOp {
         if(containables.isEmpty() && activatables.isEmpty())
             return false;
 
+        int totalContainables = containables.size();
+        List<Block> existingContainables = seller.getContainables();
+        for(Block block : existingContainables) {
+            if(containables.contains(block))
+                totalContainables--;
+            else
+                totalContainables++;
+        }
+
+        boolean exceeded = signShopConfig.ExceedsMaxChestsPerShop(totalContainables);
+        if(exceeded) {
+            Map<String, String> parts = new LinkedHashMap<>();
+            parts.put("!maxAmountOfChests", Integer.toString(signShopConfig.getMaxChestsPerShop()));
+            ssPlayer.sendMessage(signShopConfig.getError("exceeded_max_amount_of_chests_per_shop", parts));
+            return false;
+        }
+
         List<SignShopOperationListItem> SignShopOperations = signshopUtil.getSignShopOps(operation);
         if (SignShopOperations == null) {
-            ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("invalid_operation", null));
+            ssPlayer.sendMessage(signShopConfig.getError("invalid_operation", null));
             return false;
         }
 
@@ -103,24 +124,24 @@ public class LinkAdditionalBlocks implements SignShopSpecialOp {
 
             bSetupOK = ssOperation.getOperation().setupOperation(ssArgs);
             if (!bSetupOK) {
-                ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("failed_to_update_shop", ssArgs.getMessageParts()));
+                ssPlayer.sendMessage(signShopConfig.getError("failed_to_update_shop", ssArgs.getMessageParts()));
                 return true;
             }
         }
         if (!bSetupOK) {
-            ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("failed_to_update_shop", ssArgs.getMessageParts()));
+            ssPlayer.sendMessage(signShopConfig.getError("failed_to_update_shop", ssArgs.getMessageParts()));
             return true;
         }
 
         if (signshopUtil.cantGetPriceFromMoneyEvent(ssArgs)) {
-            ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("failed_to_update_shop", ssArgs.getMessageParts()));
+            ssPlayer.sendMessage(signShopConfig.getError("failed_to_update_shop", ssArgs.getMessageParts()));
             return true;
         }
 
         SSCreatedEvent createdevent = SSEventFactory.generateCreatedEvent(ssArgs);
         SignShop.scheduleEvent(createdevent);
         if(createdevent.isCancelled()) {
-            ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("failed_to_update_shop", ssArgs.getMessageParts()));
+            ssPlayer.sendMessage(signShopConfig.getError("failed_to_update_shop", ssArgs.getMessageParts()));
             return true;
         }
 
@@ -130,7 +151,7 @@ public class LinkAdditionalBlocks implements SignShopSpecialOp {
             clicks.removePlayerFromClickmap(player);
         }
 
-        ssPlayer.sendMessage(SignShop.getInstance().getSignShopConfig().getError("updated_shop", ssArgs.getMessageParts()));
+        ssPlayer.sendMessage(signShopConfig.getError("updated_shop", ssArgs.getMessageParts()));
 
         return true;
     }
